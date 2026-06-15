@@ -1,6 +1,6 @@
 # FastBound MCP
 
-An [MCP](https://modelcontextprotocol.io) server for the [FastBound](https://www.fastbound.com) firearms **Acquisition & Disposition (A&D)** API — the electronic bound book used by US Federal Firearms Licensees (FFLs). It lets an MCP client (Claude Desktop, Claude Code, etc.) search inventory, record acquisitions and dispositions, manage contacts, and pull reports through natural language.
+An [MCP](https://modelcontextprotocol.io) server for the [FastBound](https://www.fastbound.com) firearms **Acquisition & Disposition (A&D)** API — the electronic bound book used by US Federal Firearms Licensees (FFLs). It lets an MCP client (Claude Desktop, Claude Code, Codex CLI, Codex Desktop, etc.) search inventory, record acquisitions and dispositions, manage contacts, and pull reports through natural language.
 
 > ⚠️ **Compliance disclaimer.** This tool writes to ATF-regulated records (27 CFR Part 478). You — the FFL/operator — are solely responsible for the accuracy and legality of every record. Test against a FastBound **TEST account** before touching production data. Writes are **disabled by default** (see Write safety).
 
@@ -45,6 +45,24 @@ Add to `claude_desktop_config.json`:
   }
 }
 ```
+
+### Codex (CLI & Desktop)
+
+Codex loads MCP servers over stdio, and both the **Codex CLI** and the **Codex desktop / IDE app** read the same config file: `~/.codex/config.toml`. This is a standard stdio MCP server, so a single entry works for both:
+
+```toml
+[mcp_servers.fastbound]
+command = "node"
+args = ["/absolute/path/to/fastbound-mcp/dist/index.js"]
+env = { FASTBOUND_ACCOUNT_NUMBER = "12345", FASTBOUND_API_KEY = "your-api-key", FASTBOUND_AUDIT_USER = "you@ffl.com", FASTBOUND_ALLOW_WRITES = "false" }
+```
+
+- **Codex CLI** — run `npm run build` first so `dist/` exists, then start `codex`; the `/mcp` command lists the connected `fastbound` server and its tools.
+- **Codex Desktop / IDE extension** — shares the same `~/.codex/config.toml`. Add the block above (or use the app's MCP settings panel), then restart the app to load it.
+
+If you `npm i -g .` (or publish the package), replace the `node` + absolute-path form with `command = "fastbound-mcp"`.
+
+**Compatibility is verified end-to-end:** all 51 tool schemas are standard JSON Schema (draft-07, `additionalProperties: false`, no `$ref`/`anyOf`); tool names stay within OpenAI's function-name limits; the server emits only clean newline-delimited JSON-RPC on stdout (no log pollution) and negotiates MCP protocol `2025-06-18`. Codex's client accepts the tools without modification.
 
 ## Configuration
 

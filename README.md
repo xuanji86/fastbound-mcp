@@ -1,0 +1,102 @@
+# FastBound MCP
+
+An [MCP](https://modelcontextprotocol.io) server for the [FastBound](https://www.fastbound.com) firearms **Acquisition & Disposition (A&D)** API — the electronic bound book used by US Federal Firearms Licensees (FFLs). It lets an MCP client (Claude Desktop, Claude Code, etc.) search inventory, record acquisitions and dispositions, manage contacts, and pull reports through natural language.
+
+> ⚠️ **Compliance disclaimer.** This tool writes to ATF-regulated records (27 CFR Part 478). You — the FFL/operator — are solely responsible for the accuracy and legality of every record. Test against a FastBound **TEST account** before touching production data. Writes are **disabled by default** (see Write safety).
+
+## Features
+
+- **39 tools** covering account/reference, items, acquisitions, dispositions, contacts, reports, webhooks, and inventory — near-complete coverage of the FastBound v1 Account API.
+- **Guarded writes with dry-run preview.** Writes are off unless you opt in; committing/destructive operations preview exactly what they will send and require an explicit `confirm:true`.
+- **Rate-limit aware** (60 req/min token bucket + 429 backoff) and surfaces FastBound's side-effect headers (multiple-sale reports, auto-acquisitions on FFL transfers, contact dedupe).
+
+## Install
+
+The server runs over stdio and is configured entirely through environment variables.
+
+### Claude Code
+
+```bash
+claude mcp add fastbound \
+  -e FASTBOUND_ACCOUNT_NUMBER=12345 \
+  -e FASTBOUND_API_KEY=your-api-key \
+  -e FASTBOUND_AUDIT_USER=you@ffl.com \
+  -e FASTBOUND_ALLOW_WRITES=false \
+  -- npx -y fastbound-mcp
+```
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "fastbound": {
+      "command": "npx",
+      "args": ["-y", "fastbound-mcp"],
+      "env": {
+        "FASTBOUND_ACCOUNT_NUMBER": "12345",
+        "FASTBOUND_API_KEY": "your-api-key",
+        "FASTBOUND_AUDIT_USER": "you@ffl.com",
+        "FASTBOUND_ALLOW_WRITES": "false"
+      }
+    }
+  }
+}
+```
+
+## Configuration
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `FASTBOUND_ACCOUNT_NUMBER` | yes | — | Account number (the numeric id in your cloud.fastbound.com URL). Used as the Basic-auth username. |
+| `FASTBOUND_API_KEY` | yes | — | API key from Settings → Account. Basic-auth password. |
+| `FASTBOUND_AUDIT_USER` | recommended | — | Email recorded as `X-AuditUser` on writes (ATF audit trail). Must be an active account user. Per-call `auditUser` overrides it. |
+| `FASTBOUND_ALLOW_WRITES` | no | `false` | Master write switch. When false, every write tool refuses and sends nothing. |
+| `FASTBOUND_BASE_URL` | no | `https://cloud.fastbound.com` | API root override. |
+| `FASTBOUND_API_VERSION` | no | — | Optional `x-api-version` header. |
+
+Get a free **TEST account** at fastbound.com to build and validate integrations without affecting real records. Generate the API key in Settings → Account, and find the account number in your dashboard URL.
+
+## Write safety
+
+This server treats writes as dangerous by default:
+
+1. **Off by default.** With `FASTBOUND_ALLOW_WRITES` unset/false, every write tool returns `BLOCKED` and sends nothing.
+2. **Audit user required.** Writes need a valid `X-AuditUser` email (from `FASTBOUND_AUDIT_USER` or a per-call `auditUser`).
+3. **Dry-run by default for the dangerous ones.** Committing or destructive tools (`acquire`, `dispose`, `commit_*`, `delete_item`, `undispose_item`, `merge_contacts`, `update_*`, theft-loss/destroyed/NFA, …) return a `DRY RUN` preview showing the exact method, path, and request body. Re-call with `confirm:true` to execute. The preview is built from the same code that sends the live request, so it can't drift.
+4. **Staging tools execute directly.** Creating *pending* (uncommitted) records or adding items to them carries no ATF effect, so those run without a confirm step (but still require the write switch + audit user).
+
+Tool results are tagged `OK` / `DRY RUN` / `BLOCKED` / `ERROR` on the first line.
+
+## Tools
+
+- **Reference:** `get_account`, `list_smartlists`, `list_users`
+- **Items:** `search_items`, `get_item`, `update_item`, `set_item_external_id`, `delete_item`, `undispose_item`
+- **Acquisitions:** `search_acquisitions`, `get_acquisition`, `acquire`, `create_pending_acquisition`, `add_acquisition_items`, `commit_acquisition`
+- **Dispositions:** `search_dispositions`, `get_disposition`, `list_4473_dispositions`, `dispose`, `create_pending_disposition`, `add_disposition_items`, `remove_disposition_items`, `commit_disposition`, `lock_disposition`, `dispose_theft_loss`, `dispose_destroyed`, `dispose_nfa`
+- **Contacts:** `search_contacts`, `get_contact`, `create_contact`, `update_contact`, `manage_contact_licenses`, `merge_contacts`
+- **Reports:** `download_bound_book`, `download_4473`, `download_attachment`, `download_multiple_sale_report`
+- **Webhooks / Inventory:** `manage_webhooks`, `bulk_verify_inventory`
+
+Firearm classification fields (caliber, manufacturer, type, condition, location) are account-configurable — use `list_smartlists` to discover valid values before writing.
+
+## Development
+
+```bash
+npm install
+npm run build        # tsc → dist/
+npm test             # vitest (offline unit tests)
+npm run typecheck
+```
+
+The unit tests are fully mocked and offline. An opt-in live smoke test (`test/smoke.account.test.ts`) runs read-only `get_account` against a real account when `FASTBOUND_ACCOUNT_NUMBER`/`FASTBOUND_API_KEY` are set, and skips otherwise:
+
+```bash
+FASTBOUND_ACCOUNT_NUMBER=... FASTBOUND_API_KEY=... npx vitest run test/smoke.account.test.ts
+```
+
+## License
+
+MIT

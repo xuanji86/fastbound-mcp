@@ -7,7 +7,9 @@
     "fastbound-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=18"
@@ -30,6 +32,15 @@
     "firearms"
   ],
   "license": "MIT",
+  "author": "Anji Xu",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xuanji86/fastbound-mcp.git"
+  },
+  "homepage": "https://github.com/xuanji86/fastbound-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/xuanji86/fastbound-mcp/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.0",
     "zod": "^3.23.8"

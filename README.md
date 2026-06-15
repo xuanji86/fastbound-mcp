@@ -4,6 +4,8 @@ An [MCP](https://modelcontextprotocol.io) server for the [FastBound](https://www
 
 > ⚠️ **Compliance disclaimer.** This tool writes to ATF-regulated records (27 CFR Part 478). You — the FFL/operator — are solely responsible for the accuracy and legality of every record. Test against a FastBound **TEST account** before touching production data. Writes are **disabled by default** (see Write safety).
 
+> **Unofficial.** A community-built integration — not affiliated with, endorsed by, or sponsored by FastBound. "FastBound" is a trademark of its respective owner, used here nominatively to describe API compatibility. See [`NOTICE`](./NOTICE).
+
 ## Features
 
 - **51 tools** covering account/reference, items, acquisitions, dispositions, contacts, reports, webhooks, and inventory — comprehensive coverage of the FastBound v1 Account API.

@@ -64,6 +64,30 @@ describe("update_item GET-merge-PUT", () => {
   });
 });
 
+describe("update_acquisition GET-merge-PUT", () => {
+  it("merges changes over the current pending acquisition and previews the body", async () => {
+    const current = {
+      id: "a1",
+      type: "Consignment",
+      date: "2026-01-01",
+      purchaseOrderNumber: "PO-7",
+      note: "old note",
+    };
+    const tool = find(acquisitionTools, "update_acquisition");
+    const res = await tool.handler({ id: "a1", note: "new note", confirm: true }, ctxWith(current));
+    // confirm:true → executes (mock client.put returns ok); but describe ran the merge.
+    // Re-run without confirm to inspect the merged preview body.
+    const preview = await tool.handler({ id: "a1", note: "new note" }, ctxWith(current));
+    const t = text(preview);
+    expect(t).toMatch(/^DRY RUN/);
+    expect(t).toContain("Would PUT /Acquisitions/a1");
+    expect(t).toContain('"note": "new note"'); // changed
+    expect(t).toContain('"type": "Consignment"'); // carried from current (required)
+    expect(t).toContain('"purchaseOrderNumber": "PO-7"'); // preserved, not nulled
+    expect(text(res)).toMatch(/^OK/); // confirm:true path executed
+  });
+});
+
 describe("acquire dry-run", () => {
   it("previews the CreateAndCommit body without sending", async () => {
     const tool = find(acquisitionTools, "acquire");

@@ -6,7 +6,7 @@ An [MCP](https://modelcontextprotocol.io) server for the [FastBound](https://www
 
 ## Features
 
-- **39 tools** covering account/reference, items, acquisitions, dispositions, contacts, reports, webhooks, and inventory — near-complete coverage of the FastBound v1 Account API.
+- **51 tools** covering account/reference, items, acquisitions, dispositions, contacts, reports, webhooks, and inventory — comprehensive coverage of the FastBound v1 Account API.
 - **Guarded writes with dry-run preview.** Writes are off unless you opt in; committing/destructive operations preview exactly what they will send and require an explicit `confirm:true`.
 - **Rate-limit aware** (60 req/min token bucket + 429 backoff) and surfaces FastBound's side-effect headers (multiple-sale reports, auto-acquisitions on FFL transfers, contact dedupe).
 
@@ -73,9 +73,9 @@ Tool results are tagged `OK` / `DRY RUN` / `BLOCKED` / `ERROR` on the first line
 ## Tools
 
 - **Reference:** `get_account`, `list_smartlists`, `list_users`
-- **Items:** `search_items`, `get_item`, `update_item`, `set_item_external_id`, `delete_item`, `undispose_item`
-- **Acquisitions:** `search_acquisitions`, `get_acquisition`, `acquire`, `create_pending_acquisition`, `add_acquisition_items`, `commit_acquisition`
-- **Dispositions:** `search_dispositions`, `get_disposition`, `list_4473_dispositions`, `dispose`, `create_pending_disposition`, `add_disposition_items`, `remove_disposition_items`, `commit_disposition`, `lock_disposition`, `dispose_theft_loss`, `dispose_destroyed`, `dispose_nfa`
+- **Items:** `search_items`, `get_item`, `update_item`, `set_item_external_id`, `set_item_acquisition_contact`, `delete_item`, `undispose_item`
+- **Acquisitions:** `search_acquisitions`, `get_acquisition`, `get_acquisition_item`, `acquire`, `create_pending_acquisition`, `add_acquisition_items`, `update_acquisition`, `update_acquisition_item`, `attach_acquisition_contact`, `commit_acquisition`, `delete_acquisition`, `delete_acquisition_item`
+- **Dispositions:** `search_dispositions`, `get_disposition`, `list_disposition_items`, `list_4473_dispositions`, `dispose`, `create_pending_disposition`, `add_disposition_items`, `update_disposition`, `edit_disposition_item_price`, `attach_disposition_contact`, `remove_disposition_items`, `commit_disposition`, `lock_disposition`, `dispose_theft_loss`, `dispose_destroyed`, `dispose_nfa`, `delete_disposition`
 - **Contacts:** `search_contacts`, `get_contact`, `create_contact`, `update_contact`, `manage_contact_licenses`, `merge_contacts`
 - **Reports:** `download_bound_book`, `download_4473`, `download_attachment`, `download_multiple_sale_report`
 - **Webhooks / Inventory:** `manage_webhooks`, `bulk_verify_inventory`

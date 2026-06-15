@@ -14,8 +14,31 @@ import {
   destroyedShape,
   nfaShape,
 } from "../schemas/dispositions.js";
-import { writeHandler, stripControl } from "./run.js";
+import { writeHandler, stripControl, bodyWithout, mergeFields } from "./run.js";
+import type { ToolContext } from "../writeGuard.js";
 import type { DispositionsList } from "../types.js";
+
+const EDIT_DISPOSITION_FIELDS = [
+  "externalId",
+  "date",
+  "submissionDate",
+  "type",
+  "note",
+  "ttsn",
+  "generateTTSN",
+  "otsn",
+  "purchaseOrderNumber",
+  "invoiceNumber",
+  "shipmentTrackingNumber",
+  "theftLoss_DiscoveredDate",
+  "theftLoss_Type",
+  "theftLoss_ATFIssuedIncidentNumber",
+  "theftLoss_PoliceIncidentNumber",
+  "destroyed_Date",
+  "destroyed_Description",
+  "destroyed_Witness1",
+  "destroyed_Witness2",
+] as const;
 
 // ---- Reads ----------------------------------------------------------------
 
@@ -255,17 +278,148 @@ const disposeNfa: ToolDef = {
   }),
 };
 
+const listDispositionItems: ToolDef = {
+  name: "list_disposition_items",
+  title: "List disposition items",
+  description: "List the items on a disposition. Read-only.",
+  inputSchema: { id: z.string().min(1).describe("GUID of the disposition.") },
+  annotations: { readOnlyHint: true, openWorldHint: true },
+  handler: async (args, ctx) => {
+    const data = await ctx.client.get<{ items?: unknown[] }>(
+      `/Dispositions/${encodeURIComponent(args.id)}/Items`,
+    );
+    return okResult(`items on disposition ${args.id}`, data);
+  },
+};
+
+const updateDisposition: ToolDef = {
+  name: "update_disposition",
+  title: "Update disposition",
+  description:
+    "Edit header fields on a PENDING disposition (type, date, note, TTSN/OTSN, PO/invoice/tracking, theft-loss/destroyed details). Read-merge-write so unspecified fields keep their values. Dry-run by default; pass confirm:true. Write.",
+  inputSchema: {
+    id: z.string().min(1).describe("GUID of the pending disposition."),
+    type: z.string().optional().describe("Disposition type (see list_smartlists DisposeType)."),
+    date: z.string().optional(),
+    submissionDate: z.string().optional(),
+    note: z.string().optional(),
+    externalId: z.string().optional(),
+    ttsn: z.string().optional(),
+    generateTTSN: z.boolean().optional(),
+    otsn: z.string().optional(),
+    purchaseOrderNumber: z.string().optional(),
+    invoiceNumber: z.string().optional(),
+    shipmentTrackingNumber: z.string().optional(),
+    theftLoss_DiscoveredDate: z.string().optional(),
+    theftLoss_Type: z.string().optional(),
+    theftLoss_ATFIssuedIncidentNumber: z.string().optional(),
+    theftLoss_PoliceIncidentNumber: z.string().optional(),
+    destroyed_Date: z.string().optional(),
+    destroyed_Description: z.string().optional(),
+    destroyed_Witness1: z.string().optional(),
+    destroyed_Witness2: z.string().optional(),
+    ...auditUserArg,
+    ...confirmFlag,
+  },
+  annotations: { destructiveHint: false, idempotentHint: true },
+  handler: writeHandler<any>({
+    dryRunnable: true,
+    describe: async (args, ctx: ToolContext) => {
+      const current = await ctx.client.get<Record<string, unknown>>(
+        `/Dispositions/${encodeURIComponent(args.id)}`,
+      );
+      const changes = bodyWithout(args, ["id"]);
+      return {
+        method: "PUT",
+        path: `/Dispositions/${encodeURIComponent(args.id)}`,
+        body: mergeFields(current, changes, EDIT_DISPOSITION_FIELDS),
+        summary: `Update disposition ${args.id} (${Object.keys(changes).length} field(s) changed).`,
+        previewNote: "a read of the current disposition was performed to compute the merged body",
+      };
+    },
+  }),
+};
+
+const editDispositionItemPrice: ToolDef = {
+  name: "edit_disposition_item_price",
+  title: "Edit disposition item price",
+  description: "Set the sale price of an item on a pending disposition. Executes directly. Write.",
+  inputSchema: {
+    id: z.string().min(1).describe("GUID of the disposition."),
+    itemId: z.string().min(1).describe("GUID of the inventory item on the disposition."),
+    price: z.number().describe("New sale price."),
+    ...auditUserArg,
+  },
+  annotations: { destructiveHint: false, idempotentHint: true },
+  handler: writeHandler<{ id: string; itemId: string; price: number; auditUser?: string }>({
+    dryRunnable: false,
+    describe: (args) => ({
+      method: "PUT",
+      path: `/Dispositions/${encodeURIComponent(args.id)}/Items/EditPrice/${encodeURIComponent(args.itemId)}`,
+      body: { price: args.price },
+      summary: `Set price of item ${args.itemId} on disposition ${args.id} to ${args.price}.`,
+    }),
+  }),
+};
+
+const attachDispositionContact: ToolDef = {
+  name: "attach_disposition_contact",
+  title: "Attach disposition contact",
+  description:
+    "Assign an existing recipient/buyer contact to a pending disposition. Executes directly. Write.",
+  inputSchema: {
+    id: z.string().min(1).describe("GUID of the pending disposition."),
+    contactId: z.string().min(1).describe("GUID of the recipient contact to attach."),
+    ...auditUserArg,
+  },
+  annotations: { destructiveHint: false, idempotentHint: true },
+  handler: writeHandler<{ id: string; contactId: string; auditUser?: string }>({
+    dryRunnable: false,
+    describe: (args) => ({
+      method: "PUT",
+      path: `/Dispositions/${encodeURIComponent(args.id)}/AttachContact/${encodeURIComponent(args.contactId)}`,
+      summary: `Attach contact ${args.contactId} to disposition ${args.id}.`,
+    }),
+  }),
+};
+
+const deleteDisposition: ToolDef = {
+  name: "delete_disposition",
+  title: "Delete pending disposition",
+  description:
+    "Delete a PENDING (uncommitted) disposition draft. Dry-run by default; pass confirm:true. Destructive write.",
+  inputSchema: {
+    id: z.string().min(1).describe("GUID of the pending disposition to delete."),
+    ...auditUserArg,
+    ...confirmFlag,
+  },
+  annotations: { destructiveHint: true },
+  handler: writeHandler<{ id: string; auditUser?: string; confirm?: boolean }>({
+    dryRunnable: true,
+    describe: (args) => ({
+      method: "DELETE",
+      path: `/Dispositions/${encodeURIComponent(args.id)}`,
+      summary: `Delete pending disposition ${args.id}.`,
+    }),
+  }),
+};
+
 export const dispositionTools: ToolDef[] = [
   searchDispositions,
   getDisposition,
+  listDispositionItems,
   list4473Dispositions,
   dispose,
   createPendingDisposition,
   addDispositionItems,
+  updateDisposition,
+  editDispositionItemPrice,
+  attachDispositionContact,
   removeDispositionItems,
   commitDisposition,
   lockDisposition,
   disposeTheftLoss,
   disposeDestroyed,
   disposeNfa,
+  deleteDisposition,
 ];

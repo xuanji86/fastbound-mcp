@@ -50,3 +50,21 @@ export function bodyWithout<T extends WriteArgs>(args: T, omit: string[]): Recor
   for (const key of omit) delete rest[key];
   return rest;
 }
+
+/**
+ * Build a full PUT body for a GET-merge-PUT edit: for each field, take the caller's
+ * change if present, else carry the current record's value. Drops null/undefined so
+ * absent optionals are not sent as nulls.
+ */
+export function mergeFields(
+  current: Record<string, unknown>,
+  changes: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  for (const f of fields) {
+    const v = f in changes ? changes[f] : current[f];
+    if (v !== undefined && v !== null) body[f] = v;
+  }
+  return body;
+}

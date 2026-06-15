@@ -216,11 +216,33 @@ const undisposeItem: ToolDef = {
   }),
 };
 
+const setItemAcquisitionContact: ToolDef = {
+  name: "set_item_acquisition_contact",
+  title: "Set item acquisition contact",
+  description:
+    "Set the acquisition (source) contact on an item. Executes directly. Write.",
+  inputSchema: {
+    id: z.string().min(1).describe("FastBound GUID of the item."),
+    contactId: z.string().min(1).describe("GUID of the acquisition/source contact."),
+    ...auditUserArg,
+  },
+  annotations: { destructiveHint: false, idempotentHint: true },
+  handler: writeHandler<{ id: string; contactId: string; auditUser?: string }>({
+    dryRunnable: false,
+    describe: (args) => ({
+      method: "PUT",
+      path: `/Items/${encodeURIComponent(args.id)}/AcquisitionContact/${encodeURIComponent(args.contactId)}`,
+      summary: `Set acquisition contact of item ${args.id} to ${args.contactId}.`,
+    }),
+  }),
+};
+
 export const itemTools: ToolDef[] = [
   searchItems,
   getItem,
   updateItem,
   setItemExternalId,
+  setItemAcquisitionContact,
   deleteItem,
   undisposeItem,
 ];

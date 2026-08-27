@@ -6,6 +6,7 @@
  * only real API/validation failures set isError.
  */
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { AccountConfig } from "./config.js";
 
 export function textResult(text: string, isError = false): CallToolResult {
   return { content: [{ type: "text", text }], isError };
@@ -49,10 +50,13 @@ export interface DryRunPreview {
   summary: string;
   previewNote?: string;
   audit: string;
+  /** The account the request would hit — shown so a preview can never hide the target book. */
+  account: AccountConfig;
 }
 
 export function dryRunResult(p: DryRunPreview): CallToolResult {
   let text = `DRY RUN — nothing was sent.\n${p.summary}\n`;
+  text += `Account: ${p.account.label} (${p.account.alias} #${p.account.accountNumber})\n`;
   text += `Would ${p.method} ${p.path}\nX-AuditUser: ${p.audit}`;
   if (p.body !== undefined) text += `\nBody:\n${prettyJson(p.body)}`;
   if (p.previewNote) text += `\n(${p.previewNote})`;

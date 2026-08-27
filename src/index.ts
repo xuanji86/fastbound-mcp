@@ -3,13 +3,19 @@
  * FastBound MCP server — entry point.
  *
  * Wires the tool registry onto an McpServer over stdio. Kept intentionally thin:
- * all behaviour lives in config/client/writeGuard/tools so this file does not grow
- * with the tool count.
+ * all behaviour lives in config/accounts/client/writeGuard/tools so this file does
+ * not grow with the tool count.
+ *
+ * Multi-account plumbing lives here because it is uniform: every API tool gets an
+ * optional `account` argument injected, the argument is resolved (and stripped, so
+ * it never reaches a request body) before the handler runs, and every result is
+ * tagged with the account it actually hit.
  */
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { loadConfig } from "./config.js";
-import { FastBoundClient } from "./client.js";
+import { loadConfig, type AccountConfig } from "./config.js";
+import { AccountRegistry, accountTag, schemaFor, tagResult } from "./accounts.js";
 import { FastBoundApiError, formatApiError } from "./errors.js";
 import { errorResult } from "./result.js";
 import type { ToolContext } from "./writeGuard.js";
@@ -28,12 +34,11 @@ async function invoke(tool: ToolDef, args: unknown, ctx: ToolContext) {
 
 async function main(): Promise<void> {
   const config = loadConfig(); // throws on missing creds → fatal before connecting
-  const client = new FastBoundClient(config);
-  const ctx: ToolContext = { client, config };
+  const registry = new AccountRegistry(config);
 
   assertUniqueToolNames();
 
-  const server = new McpServer({ name: "fastbound-mcp", version: "0.1.0" });
+  const server = new McpServer({ name: "fastbound-mcp", version: "0.2.0" });
 
   for (const tool of allTools) {
     server.registerTool(
@@ -41,12 +46,34 @@ async function main(): Promise<void> {
       {
         title: tool.title,
         description: tool.description,
-        inputSchema: tool.inputSchema,
+        inputSchema: schemaFor(tool),
         annotations: tool.annotations,
       },
-      (args: unknown) => invoke(tool, args, ctx),
+      async (args: unknown): Promise<CallToolResult> => {
+        const { account: ref, ...rest } = (args ?? {}) as Record<string, unknown>;
+        let account: AccountConfig;
+        try {
+          // Local tools act on the registry itself and keep their own `account` arg.
+          account = tool.local ? registry.active : registry.resolve(ref as string | undefined);
+        } catch (err) {
+          return errorResult(err instanceof Error ? err.message : String(err));
+        }
+        const ctx: ToolContext = { client: registry.client(account), config: account, accounts: registry };
+        if (tool.local) return invoke(tool, args, ctx);
+        return tagResult(await invoke(tool, rest, ctx), account);
+      },
     );
   }
+
+  console.error(
+    `[fastbound-mcp] accounts: ${registry
+      .list()
+      .map(
+        (a) =>
+          `${accountTag(a)}${registry.isActive(a) ? " (active)" : ""} writes=${a.allowWrites ? "on" : "off"}`,
+      )
+      .join(", ")}`,
+  );
 
   await server.connect(new StdioServerTransport());
 }

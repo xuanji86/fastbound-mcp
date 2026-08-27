@@ -11,14 +11,19 @@
  * `describe()` builds both the dry-run preview and the exact request the inner handler
  * sends, so a preview can never drift from what actually executes.
  */
-import type { Config } from "./config.js";
+import type { AccountConfig } from "./config.js";
 import type { FastBoundClient } from "./client.js";
+import type { AccountRegistry } from "./accounts.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { blockedResult, dryRunResult } from "./result.js";
 
 export interface ToolContext {
+  /** Client bound to the account this call resolved to. */
   client: FastBoundClient;
-  config: Config;
+  /** The resolved account's settings (write switch, audit user, …). */
+  config: AccountConfig;
+  /** Every configured account, for the account-management tools. */
+  accounts: AccountRegistry;
 }
 
 export interface WritePlan {
@@ -70,7 +75,8 @@ export function withWriteGuard<A extends WriteArgs>(
     // 1. Master switch.
     if (!ctx.config.allowWrites) {
       return blockedResult(
-        "Writes are disabled. Set FASTBOUND_ALLOW_WRITES=true to enable. No request was sent.",
+        `Writes are disabled for account "${ctx.config.alias}" (#${ctx.config.accountNumber}). ` +
+          "Enable them for this account in the server environment (see .env.example). No request was sent.",
       );
     }
 
@@ -78,7 +84,8 @@ export function withWriteGuard<A extends WriteArgs>(
     const candidate = (args.auditUser ?? ctx.config.defaultAuditUser)?.trim();
     if (!isValidAuditEmail(candidate)) {
       return blockedResult(
-        "A valid X-AuditUser email is required for writes. Pass `auditUser` or set FASTBOUND_AUDIT_USER. No request was sent.",
+        "A valid X-AuditUser email is required for writes. Pass `auditUser`, or set a default audit " +
+          `user for account "${ctx.config.alias}" in the server environment. No request was sent.`,
       );
     }
     const audit = candidate;
@@ -88,7 +95,7 @@ export function withWriteGuard<A extends WriteArgs>(
 
     // 4. Dry-run gate for committing/destructive tools.
     if (opts.dryRunnable && args.confirm !== true) {
-      return dryRunResult({ ...plan, audit });
+      return dryRunResult({ ...plan, audit, account: ctx.config });
     }
 
     // Execute: the inner handler sends exactly `plan`.

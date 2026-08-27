@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { withWriteGuard, type ToolContext, type WritePlan, type WriteArgs } from "../src/writeGuard.js";
-import type { Config } from "../src/config.js";
+import type { AccountConfig } from "../src/config.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 function text(r: CallToolResult): string {
@@ -18,8 +18,10 @@ function makeCtx(allowWrites: boolean, defaultAuditUser: string | undefined) {
     del: vi.fn(),
     downloadBinary: vi.fn(),
   };
-  const config: Config = Object.freeze({
-    accountNumber: "1",
+  const config: AccountConfig = Object.freeze({
+    alias: "main",
+    label: "Main Shop",
+    accountNumber: "10001",
     apiKey: "k",
     defaultAuditUser,
     allowWrites,
@@ -52,6 +54,19 @@ function build(dryRunnable: boolean) {
 }
 
 describe("withWriteGuard", () => {
+  it("names the account in the dry-run preview so the target book is never hidden", async () => {
+    const { ctx } = makeCtx(true, "clerk@ffl.com");
+    const { guarded } = build(true);
+    const res = await guarded({}, ctx);
+    expect(text(res)).toContain("Account: Main Shop (main #10001)");
+  });
+
+  it("names the account when its write switch is off", async () => {
+    const { ctx } = makeCtx(false, "clerk@ffl.com");
+    const { guarded } = build(true);
+    expect(text(await guarded({ confirm: true }, ctx))).toContain('account "main" (#10001)');
+  });
+
   it("BLOCKS and sends nothing when writes are disabled", async () => {
     const { ctx, client } = makeCtx(false, "clerk@ffl.com");
     const { guarded, describe, run } = build(true);

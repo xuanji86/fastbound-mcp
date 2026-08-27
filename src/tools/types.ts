@@ -21,6 +21,11 @@ export interface ToolDef {
   description: string;
   inputSchema: ZodRawShape;
   annotations?: ToolAnnotations;
+  /**
+   * true → the tool only touches server-local state (the account registry), so it gets
+   * no injected `account` argument and its result carries no account tag.
+   */
+  local?: boolean;
   /** Receives args already validated against inputSchema by the MCP SDK. */
   handler: (args: any, ctx: ToolContext) => Promise<CallToolResult>;
 }

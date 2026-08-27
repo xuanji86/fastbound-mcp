@@ -6,7 +6,7 @@
  * load-bearing `X-FastBound-*` response headers. The client never guesses an
  * audit user — write methods receive it explicitly from the write guard.
  */
-import type { Config } from "./config.js";
+import type { AccountConfig } from "./config.js";
 import { Throttle } from "./throttle.js";
 import { FastBoundApiError, RateLimitError, type HeaderBag } from "./errors.js";
 
@@ -101,7 +101,7 @@ export class FastBoundClient {
   private readonly apiRoot: string;
   private readonly apiVersion: string | undefined;
 
-  constructor(config: Config, opts: ClientOptions = {}) {
+  constructor(config: AccountConfig, opts: ClientOptions = {}) {
     this.fetchFn = opts.fetchFn ?? fetch;
     this.throttle = opts.throttle ?? new Throttle();
     this.sleep = opts.sleep ?? realSleep;

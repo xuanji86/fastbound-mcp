@@ -8,7 +8,8 @@ An [MCP](https://modelcontextprotocol.io) server for the [FastBound](https://www
 
 ## Features
 
-- **51 tools** covering account/reference, items, acquisitions, dispositions, contacts, reports, webhooks, and inventory — comprehensive coverage of the FastBound v1 Account API.
+- **53 tools** covering account/reference, items, acquisitions, dispositions, contacts, reports, webhooks, and inventory — comprehensive coverage of the FastBound v1 Account API.
+- **Multiple accounts in one server.** Configure several bound books (a live store, a sibling store, a dev sandbox); switch the active one with `use_account`, or target another for a single call with `account:"sandbox"`. Every result says which account it hit.
 - **Guarded writes with dry-run preview.** Writes are off unless you opt in; committing/destructive operations preview exactly what they will send and require an explicit `confirm:true`.
 - **Rate-limit aware** (60 req/min token bucket + 429 backoff) and surfaces FastBound's side-effect headers (multiple-sale reports, auto-acquisitions on FFL transfers, contact dedupe).
 
@@ -64,9 +65,11 @@ env = { FASTBOUND_ACCOUNT_NUMBER = "12345", FASTBOUND_API_KEY = "your-api-key", 
 
 If you `npm i -g .` (or publish the package), replace the `node` + absolute-path form with `command = "fastbound-mcp"`.
 
-**Compatibility is verified end-to-end:** all 51 tool schemas are standard JSON Schema (draft-07, `additionalProperties: false`, no `$ref`/`anyOf`); tool names stay within OpenAI's function-name limits; the server emits only clean newline-delimited JSON-RPC on stdout (no log pollution) and negotiates MCP protocol `2025-06-18`. Codex's client accepts the tools without modification.
+**Compatibility is verified end-to-end:** all tool schemas are standard JSON Schema (draft-07, `additionalProperties: false`, no `$ref`/`anyOf`); tool names stay within OpenAI's function-name limits; the server emits only clean newline-delimited JSON-RPC on stdout (no log pollution) and negotiates MCP protocol `2025-06-18`. Codex's client accepts the tools without modification.
 
 ## Configuration
+
+### Single account
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
@@ -77,21 +80,51 @@ If you `npm i -g .` (or publish the package), replace the `node` + absolute-path
 | `FASTBOUND_BASE_URL` | no | `https://cloud.fastbound.com` | API root override. |
 | `FASTBOUND_API_VERSION` | no | — | Optional `x-api-version` header. |
 
+The account is exposed under the alias `default`.
+
+### Multiple accounts
+
+List the aliases in `FASTBOUND_ACCOUNTS`, then configure each with the same variables prefixed by its alias (uppercased, dashes → underscores). Per-account values fall back to the un-prefixed ones, so shared settings can stay global.
+
+```bash
+FASTBOUND_ACCOUNTS="main,sibling,sandbox"
+FASTBOUND_DEFAULT_ACCOUNT="main"          # optional; defaults to the first alias
+
+FASTBOUND_MAIN_LABEL="My Shop (PROD)"     # optional human name
+FASTBOUND_MAIN_ACCOUNT_NUMBER="12345"
+FASTBOUND_MAIN_API_KEY="…"                # API keys are account-bound: one per account
+FASTBOUND_MAIN_AUDIT_USER="you@ffl.com"   # must be a user ON that account
+FASTBOUND_MAIN_ALLOW_WRITES="true"        # per-account write switch
+
+FASTBOUND_SANDBOX_ACCOUNT_NUMBER="67890"
+FASTBOUND_SANDBOX_API_KEY="…"
+FASTBOUND_SANDBOX_ALLOW_WRITES="true"
+```
+
+Choosing an account, in order of precedence:
+
+1. **Per call** — every API tool takes an optional `account` (alias *or* account number): `search_items({ serial: "ABC", account: "sandbox" })`. Nothing is remembered.
+2. **Active account** — `use_account({ account: "sandbox" })` moves it for the rest of the session; `list_accounts` shows every account, its write switch, and which is active.
+3. **Default** — `FASTBOUND_DEFAULT_ACCOUNT`, else the first alias listed.
+
+An unknown alias is an error listing the configured accounts — it never silently falls back to the active one. Results carry the account they hit on the first line (`OK [sandbox #67890] — …`), and a write's `DRY RUN` preview names it explicitly.
+
 Get a free **TEST account** at fastbound.com to build and validate integrations without affecting real records. Generate the API key in Settings → Account, and find the account number in your dashboard URL.
 
 ## Write safety
 
 This server treats writes as dangerous by default:
 
-1. **Off by default.** With `FASTBOUND_ALLOW_WRITES` unset/false, every write tool returns `BLOCKED` and sends nothing.
+1. **Off by default, per account.** With that account's write switch unset/false, every write tool returns `BLOCKED` and sends nothing — so a live bound book can stay read-only while a sandbox accepts writes in the same server.
 2. **Audit user required.** Writes need a valid `X-AuditUser` email (from `FASTBOUND_AUDIT_USER` or a per-call `auditUser`).
 3. **Dry-run by default for the dangerous ones.** Committing or destructive tools (`acquire`, `dispose`, `commit_*`, `delete_item`, `undispose_item`, `merge_contacts`, `update_*`, theft-loss/destroyed/NFA, …) return a `DRY RUN` preview showing the exact method, path, and request body. Re-call with `confirm:true` to execute. The preview is built from the same code that sends the live request, so it can't drift.
 4. **Staging tools execute directly.** Creating *pending* (uncommitted) records or adding items to them carries no ATF effect, so those run without a confirm step (but still require the write switch + audit user).
 
-Tool results are tagged `OK` / `DRY RUN` / `BLOCKED` / `ERROR` on the first line.
+Tool results are tagged `OK` / `DRY RUN` / `BLOCKED` / `ERROR` on the first line, followed by the account the call hit (`OK [main #12345] — …`).
 
 ## Tools
 
+- **Accounts:** `list_accounts`, `use_account` (server-local; they pick which bound book the other tools talk to)
 - **Reference:** `get_account`, `list_smartlists`, `list_users`
 - **Items:** `search_items`, `get_item`, `update_item`, `set_item_external_id`, `set_item_acquisition_contact`, `delete_item`, `undispose_item`
 - **Acquisitions:** `search_acquisitions`, `get_acquisition`, `get_acquisition_item`, `acquire`, `create_pending_acquisition`, `add_acquisition_items`, `update_acquisition`, `update_acquisition_item`, `attach_acquisition_contact`, `commit_acquisition`, `delete_acquisition`, `delete_acquisition_item`
@@ -111,10 +144,10 @@ npm test             # vitest (offline unit tests)
 npm run typecheck
 ```
 
-The unit tests are fully mocked and offline. An opt-in live smoke test (`test/smoke.account.test.ts`) runs read-only `get_account` against a real account when `FASTBOUND_ACCOUNT_NUMBER`/`FASTBOUND_API_KEY` are set, and skips otherwise:
+The unit tests are fully mocked and offline. An opt-in live smoke test (`test/smoke.account.test.ts`) runs a read-only `get_account` against **every** configured account when credentials are present, and skips otherwise — handy right after adding an account:
 
 ```bash
-FASTBOUND_ACCOUNT_NUMBER=... FASTBOUND_API_KEY=... npx vitest run test/smoke.account.test.ts
+set -a; . ./.env; set +a; npx vitest run test/smoke.account.test.ts
 ```
 
 ## License

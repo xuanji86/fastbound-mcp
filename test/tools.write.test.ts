@@ -14,9 +14,11 @@ function text(r: CallToolResult): string {
 function ctxWith(currentDoc: unknown): ToolContext {
   return {
     config: {
+      alias: "main",
+      label: "Main Shop",
       allowWrites: true,
       defaultAuditUser: "a@b.com",
-      accountNumber: "1",
+      accountNumber: "10001",
       apiKey: "k",
       baseUrl: "https://x.test",
       apiVersion: undefined,

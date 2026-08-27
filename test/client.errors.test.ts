@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { FastBoundClient, fastBoundHeaderNotes, extractFastBoundHeaders } from "../src/client.js";
 import { FastBoundApiError, RateLimitError, formatApiError } from "../src/errors.js";
-import type { Config } from "../src/config.js";
+import type { AccountConfig } from "../src/config.js";
 
-const cfg: Config = Object.freeze({
+const cfg: AccountConfig = Object.freeze({
+  alias: "test",
+  label: "test",
   accountNumber: "12345",
   apiKey: "secret",
   defaultAuditUser: "clerk@ffl.com",

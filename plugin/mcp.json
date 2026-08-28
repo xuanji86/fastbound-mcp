@@ -1,0 +1,10 @@
+{
+  "fastbound": {
+    "type": "stdio",
+    "command": "bash",
+    "args": [
+      "-c",
+      "PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; if [ -n \"$FASTBOUND_ENV_FILE\" ] && [ -f \"$FASTBOUND_ENV_FILE\" ]; then set -a; . \"$FASTBOUND_ENV_FILE\"; set +a; fi; exec node \"${CLAUDE_PLUGIN_ROOT}/dist/fastbound-mcp.mjs\""
+    ]
+  }
+}

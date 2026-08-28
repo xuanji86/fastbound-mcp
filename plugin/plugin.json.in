@@ -1,0 +1,8 @@
+{
+  "name": "fastbound",
+  "description": "FastBound 火器 A&D 账簿 MCP 服务器(多账户 osa / aaa / sandbox,写操作按账户开关)。",
+  "version": "__VERSION__",
+  "author": { "name": "Anji Xu", "email": "xuanji86@gmail.com" },
+  "homepage": "https://github.com/xuanji86/fastbound-mcp",
+  "license": "MIT"
+}

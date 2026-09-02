@@ -14,6 +14,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { loadEnvFile } from "./envFile.js";
 import { loadConfig, type AccountConfig } from "./config.js";
 import { AccountRegistry, accountTag, schemaFor, tagResult } from "./accounts.js";
 import { FastBoundApiError, formatApiError } from "./errors.js";
@@ -33,6 +34,7 @@ async function invoke(tool: ToolDef, args: unknown, ctx: ToolContext) {
 }
 
 async function main(): Promise<void> {
+  loadEnvFile(); // .env -> process.env before any credential is read; no shell wrapper needed
   const config = loadConfig(); // throws on missing creds → fatal before connecting
   const registry = new AccountRegistry(config);
 

@@ -25,7 +25,7 @@ mkdir -p "$PLUGIN/.claude-plugin" "$PLUGIN/dist"
 # 依赖全部 bundle 进单文件:装插件时不联网、不受 npm 安装 60 秒超时影响,
 # 也避开 node_modules 里 @scope 路径被 claude.ai 上传校验拒收的问题。
 npx --yes "$ESBUILD" src/index.ts \
-  --bundle --platform=node --target=node18 --format=esm \
+  --bundle --platform=node --target=node20 --format=esm \
   --outfile="$PLUGIN/dist/$NAME-mcp.mjs" \
   --log-level=warning \
   --banner:js="import{createRequire as __cr}from'node:module';const require=__cr(import.meta.url);" \

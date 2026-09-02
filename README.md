@@ -147,7 +147,7 @@ npm run typecheck
 The unit tests are fully mocked and offline. An opt-in live smoke test (`test/smoke.account.test.ts`) runs a read-only `get_account` against **every** configured account when credentials are present, and skips otherwise — handy right after adding an account:
 
 ```bash
-set -a; . ./.env; set +a; npx vitest run test/smoke.account.test.ts
+FASTBOUND_ENV_FILE=./.env npx vitest run test/smoke.account.test.ts
 ```
 
 ## License

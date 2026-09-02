@@ -1,7 +1,8 @@
 # fastbound —— Claude Code 插件
 
 FastBound 火器 A&D 账簿 MCP 服务器。`dist/fastbound-mcp.mjs` 是把全部依赖打进去的
-单文件 bundle,**不需要 npm install / 构建**,只要机器上有 Node ≥ 18。
+单文件 bundle,**不需要 npm install / 构建**,只要机器上有 **Node ≥ 20.12**(bundle 用 `process.loadEnvFile`)。
+Windows / Linux / macOS 通用:启动就是 `node <bundle>`,不经 shell。
 
 ## 安装
 

@@ -109,7 +109,7 @@ export const accountTools: ToolDef[] = [
     name: "list_users",
     title: "List users",
     description:
-      "List users on the account. Use this to find valid emails for the X-AuditUser header required on write operations. Read-only.",
+      "List users on the account. Use this to find valid emails for the X-AuditUser header required on write operations and document downloads. Read-only.",
     inputSchema: {},
     annotations: { readOnlyHint: true, openWorldHint: true },
     handler: async (_args, ctx) => {

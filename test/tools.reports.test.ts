@@ -25,33 +25,33 @@ function ctxWith(defaultAuditUser: string | undefined) {
 
 const tool = (name: string) => reportTools.find((t) => t.name === name)!;
 
-describe("download_4473 X-AuditUser", () => {
+// FastBound answers every /Download without X-AuditUser with 400 "Invalid Audit User".
+const downloads: [string, Record<string, string>, string, Record<string, string>][] = [
+  ["download_bound_book", {}, "/Downloads/BoundBook", { method: "POST" }],
+  ["download_4473", { form4473Id: "f1" }, "/Form4473s/Download/f1", {}],
+  ["download_attachment", { attachmentId: "a1" }, "/Attachments/Download/a1", {}],
+  ["download_multiple_sale_report", { multipleSaleReportId: "r1", attachmentId: "a1" }, "/MultipleSaleReports/Download/r1/a/a1", {}],
+];
+
+describe.each(downloads)("%s X-AuditUser", (name, args, path, opts) => {
   it("sends the account default audit user, trimmed", async () => {
     const { ctx, calls } = ctxWith("  a@b.com ");
-    const res = await tool("download_4473").handler({ form4473Id: "f1" }, ctx);
+    const res = await tool(name).handler(args, ctx);
     expect(text(res)).toMatch(/^OK/);
-    expect(calls).toEqual([{ path: "/Form4473s/Download/f1", opts: { auditUser: "a@b.com" } }]);
+    expect(calls).toEqual([{ path, opts: { ...opts, auditUser: "a@b.com" } }]);
   });
 
   it("prefers the per-call auditUser", async () => {
     const { ctx, calls } = ctxWith("a@b.com");
-    await tool("download_4473").handler({ form4473Id: "f1", auditUser: "c@d.com" }, ctx);
+    await tool(name).handler({ ...args, auditUser: "c@d.com" }, ctx);
     expect(calls[0]?.opts?.auditUser).toBe("c@d.com");
   });
 
   it.each([undefined, "owner@osa"])("blocks without calling FastBound when the default is %s", async (def) => {
     const { ctx, calls } = ctxWith(def);
-    const res = await tool("download_4473").handler({ form4473Id: "f1" }, ctx);
+    const res = await tool(name).handler(args, ctx);
     expect(text(res)).toMatch(/^BLOCKED/);
     expect(text(res)).toContain('account "main"');
     expect(calls).toHaveLength(0);
-  });
-});
-
-describe("download_bound_book X-AuditUser", () => {
-  it("POSTs with the audit user", async () => {
-    const { ctx, calls } = ctxWith("a@b.com");
-    await tool("download_bound_book").handler({}, ctx);
-    expect(calls).toEqual([{ path: "/Downloads/BoundBook", opts: { method: "POST", auditUser: "a@b.com" } }]);
   });
 });

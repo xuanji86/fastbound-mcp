@@ -26,7 +26,7 @@ export const auditUserArg = {
     .email()
     .optional()
     .describe(
-      "Email recorded as X-AuditUser for the ATF audit trail. Overrides FASTBOUND_AUDIT_USER for this call. Must be an active user on the account.",
+      "Email recorded as X-AuditUser for the ATF audit trail. Overrides the account's default audit user (FASTBOUND_<ALIAS>_AUDIT_USER, else FASTBOUND_AUDIT_USER) for this call. Must be an active user on the account.",
     ),
 };
 

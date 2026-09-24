@@ -2,7 +2,9 @@
  * The write guard — the central safety mechanism.
  *
  * Every mutating tool's business handler is wrapped by `withWriteGuard`. Read tools
- * never touch this. The wrapper enforces, in order and BEFORE any network write:
+ * never touch the guard itself; the document downloads (tools/reports.ts), which
+ * FastBound also audits, share `resolveAuditUser` / `auditUserRequired` so reads and
+ * writes resolve the same audit user. The wrapper enforces, in order and BEFORE any network write:
  *   1. FASTBOUND_ALLOW_WRITES must be true            → else BLOCKED, nothing sent.
  *   2. A valid X-AuditUser email must resolve         → else BLOCKED, nothing sent.
  *   3. `describe()` builds the request plan ONCE      → preview and live send are identical.
@@ -76,6 +78,15 @@ export function resolveAuditUser(
   return isValidAuditEmail(candidate) ? candidate : undefined;
 }
 
+/** BLOCKED result when no valid audit user resolves; `what` completes "required to …". */
+export function auditUserRequired(what: string, config: Pick<AccountConfig, "alias">): CallToolResult {
+  return blockedResult(
+    `A valid X-AuditUser email is required to ${what}. Pass \`auditUser\`, or set a default audit user ` +
+      `for account "${config.alias}" in the server environment (none is set, or it is not a valid email). ` +
+      "No request was sent.",
+  );
+}
+
 export function withWriteGuard<A extends WriteArgs>(
   opts: GuardOptions<A>,
   run: GuardedRun<A>,
@@ -91,12 +102,7 @@ export function withWriteGuard<A extends WriteArgs>(
 
     // 2. Resolve + validate the audit user (per-call overrides env default).
     const audit = resolveAuditUser(args, ctx.config);
-    if (!audit) {
-      return blockedResult(
-        "A valid X-AuditUser email is required for writes. Pass `auditUser`, or set a default audit " +
-          `user for account "${ctx.config.alias}" in the server environment. No request was sent.`,
-      );
-    }
+    if (!audit) return auditUserRequired("write", ctx.config);
 
     // 3. Build the plan once (preview == live request).
     const plan = await opts.describe(args, ctx, audit);

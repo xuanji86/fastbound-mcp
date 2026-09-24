@@ -67,6 +67,15 @@ export function isValidAuditEmail(value: string | undefined): value is string {
   return typeof value === "string" && EMAIL_RE.test(value.trim());
 }
 
+/** Per-call auditUser, else the account default; undefined unless it is a valid email. */
+export function resolveAuditUser(
+  args: { auditUser?: string },
+  config: Pick<AccountConfig, "defaultAuditUser">,
+): string | undefined {
+  const candidate = (args.auditUser ?? config.defaultAuditUser)?.trim();
+  return isValidAuditEmail(candidate) ? candidate : undefined;
+}
+
 export function withWriteGuard<A extends WriteArgs>(
   opts: GuardOptions<A>,
   run: GuardedRun<A>,
@@ -81,14 +90,13 @@ export function withWriteGuard<A extends WriteArgs>(
     }
 
     // 2. Resolve + validate the audit user (per-call overrides env default).
-    const candidate = (args.auditUser ?? ctx.config.defaultAuditUser)?.trim();
-    if (!isValidAuditEmail(candidate)) {
+    const audit = resolveAuditUser(args, ctx.config);
+    if (!audit) {
       return blockedResult(
         "A valid X-AuditUser email is required for writes. Pass `auditUser`, or set a default audit " +
           `user for account "${ctx.config.alias}" in the server environment. No request was sent.`,
       );
     }
-    const audit = candidate;
 
     // 3. Build the plan once (preview == live request).
     const plan = await opts.describe(args, ctx, audit);

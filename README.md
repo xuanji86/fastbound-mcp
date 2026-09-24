@@ -75,7 +75,7 @@ If you `npm i -g .` (or publish the package), replace the `node` + absolute-path
 |---|---|---|---|
 | `FASTBOUND_ACCOUNT_NUMBER` | yes | — | Account number (the numeric id in your cloud.fastbound.com URL). Used as the Basic-auth username. |
 | `FASTBOUND_API_KEY` | yes | — | API key from Settings → Account. Basic-auth password. |
-| `FASTBOUND_AUDIT_USER` | recommended | — | Email recorded as `X-AuditUser` on writes and downloads (ATF audit trail); `download_bound_book` and `download_4473` refuse without one. Must be an active account user. Per-call `auditUser` overrides it. |
+| `FASTBOUND_AUDIT_USER` | recommended | — | Email recorded as `X-AuditUser` on writes and on the `download_bound_book` / `download_4473` reads, which refuse without one (ATF audit trail). Must be an active account user. Per-call `auditUser` overrides it. |
 | `FASTBOUND_ALLOW_WRITES` | no | `false` | Master write switch. When false, every write tool refuses and sends nothing. |
 | `FASTBOUND_BASE_URL` | no | `https://cloud.fastbound.com` | API root override. |
 | `FASTBOUND_API_VERSION` | no | — | Optional `x-api-version` header. |

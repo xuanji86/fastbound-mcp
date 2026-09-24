@@ -10,11 +10,11 @@ function text(r: CallToolResult): string {
 
 /** Context whose downloadBinary records each call's path + opts. */
 function ctxWith(defaultAuditUser: string | undefined) {
-  const calls: { path: string; opts: { auditUser?: string } | undefined }[] = [];
+  const calls: { path: string; opts: { auditUser?: string; method?: string } | undefined }[] = [];
   const ctx = {
     config: { alias: "main", defaultAuditUser, accountNumber: "10001" },
     client: {
-      downloadBinary: async (path: string, opts?: { auditUser?: string }) => {
+      downloadBinary: async (path: string, opts?: { auditUser?: string; method?: string }) => {
         calls.push({ path, opts });
         return { bytes: new Uint8Array([37, 80, 68, 70]), contentType: "application/pdf", filename: "f.pdf" };
       },
@@ -26,8 +26,8 @@ function ctxWith(defaultAuditUser: string | undefined) {
 const tool = (name: string) => reportTools.find((t) => t.name === name)!;
 
 describe("download_4473 X-AuditUser", () => {
-  it("sends the account default audit user", async () => {
-    const { ctx, calls } = ctxWith("a@b.com");
+  it("sends the account default audit user, trimmed", async () => {
+    const { ctx, calls } = ctxWith("  a@b.com ");
     const res = await tool("download_4473").handler({ form4473Id: "f1" }, ctx);
     expect(text(res)).toMatch(/^OK/);
     expect(calls).toEqual([{ path: "/Form4473s/Download/f1", opts: { auditUser: "a@b.com" } }]);
@@ -39,23 +39,19 @@ describe("download_4473 X-AuditUser", () => {
     expect(calls[0]?.opts?.auditUser).toBe("c@d.com");
   });
 
-  it("blocks without calling FastBound when no audit user is available", async () => {
-    const { ctx, calls } = ctxWith(undefined);
+  it.each([undefined, "owner@osa"])("blocks without calling FastBound when the default is %s", async (def) => {
+    const { ctx, calls } = ctxWith(def);
     const res = await tool("download_4473").handler({ form4473Id: "f1" }, ctx);
     expect(text(res)).toMatch(/^BLOCKED/);
+    expect(text(res)).toContain('account "main"');
     expect(calls).toHaveLength(0);
   });
 });
 
-describe("download_attachment X-AuditUser", () => {
-  it("passes the audit user when configured and still downloads without one", async () => {
-    const withAudit = ctxWith("a@b.com");
-    await tool("download_attachment").handler({ attachmentId: "x" }, withAudit.ctx);
-    expect(withAudit.calls[0]?.opts?.auditUser).toBe("a@b.com");
-
-    const without = ctxWith(undefined);
-    const res = await tool("download_attachment").handler({ attachmentId: "x" }, without.ctx);
-    expect(text(res)).toMatch(/^OK/);
-    expect(without.calls[0]?.opts?.auditUser).toBeUndefined();
+describe("download_bound_book X-AuditUser", () => {
+  it("POSTs with the audit user", async () => {
+    const { ctx, calls } = ctxWith("a@b.com");
+    await tool("download_bound_book").handler({}, ctx);
+    expect(calls).toEqual([{ path: "/Downloads/BoundBook", opts: { method: "POST", auditUser: "a@b.com" } }]);
   });
 });

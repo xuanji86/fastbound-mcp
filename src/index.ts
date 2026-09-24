@@ -40,7 +40,7 @@ async function main(): Promise<void> {
 
   assertUniqueToolNames();
 
-  const server = new McpServer({ name: "fastbound-mcp", version: "0.2.0" });
+  const server = new McpServer({ name: "fastbound-mcp", version: "0.2.1" });
 
   for (const tool of allTools) {
     server.registerTool(

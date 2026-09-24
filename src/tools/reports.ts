@@ -1,20 +1,21 @@
 /**
  * Reports & document downloads. These are reads (they don't mutate A&D records) so
  * they are not gated by FASTBOUND_ALLOW_WRITES. Binaries are returned base64 with a
- * size cap (see binaryResult). The bound book export and 4473 download require an
- * X-AuditUser (without it FastBound answers 400 "Invalid Audit User"); the other
- * downloads send it whenever one is configured.
+ * size cap (see binaryResult). The bound book export and the 4473 download require an
+ * X-AuditUser (without it FastBound answers 400 "Invalid Audit User").
  */
 import { z } from "zod";
 import type { ToolDef } from "./types.js";
 import { binaryResult, blockedResult } from "../result.js";
 import { auditUserArg } from "../schemas/common.js";
-import { isValidAuditEmail, type ToolContext } from "../writeGuard.js";
+import { resolveAuditUser, type ToolContext } from "../writeGuard.js";
 
-/** Per-call auditUser, else the account default; undefined unless it is a valid email. */
-function auditFor(args: { auditUser?: string }, ctx: ToolContext): string | undefined {
-  const audit = (args.auditUser ?? ctx.config.defaultAuditUser)?.trim();
-  return isValidAuditEmail(audit) ? audit : undefined;
+function auditRequired(what: string, ctx: ToolContext) {
+  return blockedResult(
+    `A valid X-AuditUser email is required to ${what}. Pass \`auditUser\`, or set a default audit user ` +
+      `for account "${ctx.config.alias}" in the server environment (none is set, or it is not a valid email). ` +
+      "No request was sent.",
+  );
 }
 
 const downloadBoundBook: ToolDef = {
@@ -25,12 +26,8 @@ const downloadBoundBook: ToolDef = {
   inputSchema: { ...auditUserArg },
   annotations: { readOnlyHint: true, openWorldHint: true },
   handler: async (args, ctx) => {
-    const audit = auditFor(args, ctx);
-    if (!audit) {
-      return blockedResult(
-        "A valid auditUser email is required to generate the bound book. Pass `auditUser` or set FASTBOUND_AUDIT_USER.",
-      );
-    }
+    const audit = resolveAuditUser(args, ctx.config);
+    if (!audit) return auditRequired("generate the bound book", ctx);
     const bin = await ctx.client.downloadBinary("/Downloads/BoundBook", { method: "POST", auditUser: audit });
     return binaryResult("bound book", bin.bytes, bin.contentType, bin.filename);
   },
@@ -44,12 +41,8 @@ const download4473: ToolDef = {
   inputSchema: { form4473Id: z.string().min(1).describe("GUID of the 4473."), ...auditUserArg },
   annotations: { readOnlyHint: true, openWorldHint: true },
   handler: async (args, ctx) => {
-    const audit = auditFor(args, ctx);
-    if (!audit) {
-      return blockedResult(
-        "A valid auditUser email is required to download a 4473. Pass `auditUser` or set FASTBOUND_AUDIT_USER.",
-      );
-    }
+    const audit = resolveAuditUser(args, ctx.config);
+    if (!audit) return auditRequired("download a 4473", ctx);
     const bin = await ctx.client.downloadBinary(`/Form4473s/Download/${encodeURIComponent(args.form4473Id)}`, {
       auditUser: audit,
     });
@@ -61,12 +54,10 @@ const downloadAttachment: ToolDef = {
   name: "download_attachment",
   title: "Download attachment",
   description: "Download an attachment file by its id. Returns the file base64-encoded. Read.",
-  inputSchema: { attachmentId: z.string().min(1).describe("GUID of the attachment."), ...auditUserArg },
+  inputSchema: { attachmentId: z.string().min(1).describe("GUID of the attachment.") },
   annotations: { readOnlyHint: true, openWorldHint: true },
   handler: async (args, ctx) => {
-    const bin = await ctx.client.downloadBinary(`/Attachments/Download/${encodeURIComponent(args.attachmentId)}`, {
-      auditUser: auditFor(args, ctx),
-    });
+    const bin = await ctx.client.downloadBinary(`/Attachments/Download/${encodeURIComponent(args.attachmentId)}`);
     return binaryResult(`attachment ${args.attachmentId}`, bin.bytes, bin.contentType, bin.filename);
   },
 };
@@ -79,13 +70,11 @@ const downloadMultipleSaleReport: ToolDef = {
   inputSchema: {
     multipleSaleReportId: z.string().min(1).describe("GUID of the multiple-sale report."),
     attachmentId: z.string().min(1).describe("GUID of the attachment within the report."),
-    ...auditUserArg,
   },
   annotations: { readOnlyHint: true, openWorldHint: true },
   handler: async (args, ctx) => {
     const bin = await ctx.client.downloadBinary(
       `/MultipleSaleReports/Download/${encodeURIComponent(args.multipleSaleReportId)}/a/${encodeURIComponent(args.attachmentId)}`,
-      { auditUser: auditFor(args, ctx) },
     );
     return binaryResult("multiple-sale report", bin.bytes, bin.contentType, bin.filename);
   },

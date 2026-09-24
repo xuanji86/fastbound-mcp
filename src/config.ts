@@ -21,7 +21,7 @@ export interface AccountConfig {
   readonly label: string;
   readonly accountNumber: string;
   readonly apiKey: string;
-  /** Default X-AuditUser email for writes; per-call `auditUser` overrides it. */
+  /** Default X-AuditUser email for writes and document downloads; per-call `auditUser` overrides it. */
   readonly defaultAuditUser: string | undefined;
   /** Per-account write switch. When false, every write tool refuses and sends nothing. */
   readonly allowWrites: boolean;

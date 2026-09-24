@@ -75,7 +75,7 @@ If you `npm i -g .` (or publish the package), replace the `node` + absolute-path
 |---|---|---|---|
 | `FASTBOUND_ACCOUNT_NUMBER` | yes | — | Account number (the numeric id in your cloud.fastbound.com URL). Used as the Basic-auth username. |
 | `FASTBOUND_API_KEY` | yes | — | API key from Settings → Account. Basic-auth password. |
-| `FASTBOUND_AUDIT_USER` | recommended | — | Email recorded as `X-AuditUser` on writes (ATF audit trail). Must be an active account user. Per-call `auditUser` overrides it. |
+| `FASTBOUND_AUDIT_USER` | recommended | — | Email recorded as `X-AuditUser` on writes and on the document downloads (`download_*`), which refuse without one (ATF audit trail). Must be an active account user. Per-call `auditUser` overrides it. |
 | `FASTBOUND_ALLOW_WRITES` | no | `false` | Master write switch. When false, every write tool refuses and sends nothing. |
 | `FASTBOUND_BASE_URL` | no | `https://cloud.fastbound.com` | API root override. |
 | `FASTBOUND_API_VERSION` | no | — | Optional `x-api-version` header. |
@@ -116,7 +116,7 @@ Get a free **TEST account** at fastbound.com to build and validate integrations 
 This server treats writes as dangerous by default:
 
 1. **Off by default, per account.** With that account's write switch unset/false, every write tool returns `BLOCKED` and sends nothing — so a live bound book can stay read-only while a sandbox accepts writes in the same server.
-2. **Audit user required.** Writes need a valid `X-AuditUser` email (from `FASTBOUND_AUDIT_USER` or a per-call `auditUser`).
+2. **Audit user required.** Writes (and the `download_*` reads) need a valid `X-AuditUser` email (from the account's default audit user or a per-call `auditUser`).
 3. **Dry-run by default for the dangerous ones.** Committing or destructive tools (`acquire`, `dispose`, `commit_*`, `delete_item`, `undispose_item`, `merge_contacts`, `update_*`, theft-loss/destroyed/NFA, …) return a `DRY RUN` preview showing the exact method, path, and request body. Re-call with `confirm:true` to execute. The preview is built from the same code that sends the live request, so it can't drift.
 4. **Staging tools execute directly.** Creating *pending* (uncommitted) records or adding items to them carries no ATF effect, so those run without a confirm step (but still require the write switch + audit user).
 

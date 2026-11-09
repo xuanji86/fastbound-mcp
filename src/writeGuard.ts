@@ -34,6 +34,8 @@ export interface WritePlan {
   path: string;
   /** Resolved request body (undefined for bodyless DELETEs). */
   body?: unknown;
+  /** Query-string parameters, if any. */
+  query?: Record<string, string>;
   /** One-line human summary of the effect. */
   summary: string;
   /** Optional note surfaced in the dry-run preview (e.g. an update's read-to-merge). */

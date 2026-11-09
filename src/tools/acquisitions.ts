@@ -74,6 +74,8 @@ const acquire: ToolDef = {
     describe: (args) => ({
       method: "POST",
       path: "/Acquisitions/CreateAndCommit",
+      // Without this the commit answers 204 and the new item ids are lost.
+      query: { listAcquiredItems: "true" },
       body: stripControl(args),
       summary: `Acquire ${args.items?.length ?? 0} firearm(s) into the A&D book (create + commit).`,
     }),

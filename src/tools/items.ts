@@ -18,7 +18,10 @@ const searchItems: ToolDef = {
   description:
     "Search the firearm inventory (the A&D book). Filter by serial, manufacturer, model, type, caliber, status, date ranges, TTSN/OTSN, and more. Returns a page of items plus the total record count. Read-only.",
   inputSchema: {
-    search: z.string().optional().describe("Free-text search across item fields."),
+    search: z
+      .string()
+      .optional()
+      .describe("Free-text search across item fields. When set, EVERY other filter is ignored."),
     serial: z.string().optional(),
     manufacturer: z.string().optional(),
     model: z.string().optional(),
@@ -33,7 +36,12 @@ const searchItems: ToolDef = {
     sku: z.string().optional(),
     ttsn: z.string().optional().describe("Transferee/Transferor transaction serial number."),
     otsn: z.string().optional(),
-    status: z.string().optional().describe("Item status filter, e.g. open/disposed."),
+    status: z
+      .string()
+      .optional()
+      .describe(
+        "Item status filter as an integer: 1 Available, 2 Pending Disposal, 3 Disposed, 4 Deleted. (In results, `status` is an object {id, name}.) In-stock = 1 and 2.",
+      ),
     isTheftLoss: z.boolean().optional(),
     isDestroyed: z.boolean().optional(),
     doNotDispose: z.boolean().optional(),
@@ -74,6 +82,26 @@ const getItem: ToolDef = {
  * present — unchanged ones come from `current`. Maps the read model's `overallLength`
  * to the edit body's `totalLength` and coerces numeric cost/price to strings.
  */
+const CARRIED_ITEM_FIELDS = [
+  "locationVerifiedUtc",
+  "dispositionType",
+  "dispose_Date",
+  "dispose_PurchaseOrderNumber",
+  "dispose_InvoiceNumber",
+  "dispose_ShipmentTrackingNumber",
+  "ttsn",
+  "otsn",
+  "submissionDate",
+  "theftLoss_DiscoveredDate",
+  "theftLoss_Type",
+  "theftLoss_ATFIssuedIncidentNumber",
+  "theftLoss_PoliceIncidentNumber",
+  "destroyed_Date",
+  "destroyed_Description",
+  "destroyed_Witness1",
+  "destroyed_Witness2",
+] as const;
+
 function buildEditItemBody(
   current: FastBoundItem,
   changes: Record<string, unknown>,
@@ -110,6 +138,9 @@ function buildEditItemBody(
     acquire_ShipmentTrackingNumber: pick("acquire_ShipmentTrackingNumber"),
   };
   for (const k of Object.keys(body)) if (body[k] === undefined) delete body[k];
+  // A disposed item's PUT is rejected (400) without dispose_Date + dispositionType, and
+  // PUT replaces the whole record — so carry every disposition-side value it has.
+  for (const k of CARRIED_ITEM_FIELDS) if (current[k] != null) body[k] = current[k];
   return body;
 }
 
@@ -155,7 +186,12 @@ const setItemExternalId: ToolDef = {
     "Set or change only the externalId of an item (links it to your system's record) without touching other fields. Write.",
   inputSchema: {
     id: z.string().min(1).describe("FastBound GUID of the item."),
-    externalId: z.string().describe("Your external identifier for this item."),
+    externalId: z
+      .string()
+      .refine((v) => !/^[0-9a-f]{32}$|^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v), {
+        message: "externalId must not be GUID-shaped — FastBound would route it as its own id.",
+      })
+      .describe("Your external identifier for this item. Must not look like a GUID."),
     ...auditUserArg,
   },
   annotations: { destructiveHint: false, idempotentHint: true },

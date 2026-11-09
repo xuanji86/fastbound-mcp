@@ -14,7 +14,7 @@ const contactRef = {
 
 const acquisitionCore = {
   type: z.string().describe("Acquisition type (required). See list_smartlists AcquireType."),
-  date: z.string().optional().describe("Acquisition date (ISO). Defaults to now if omitted."),
+  date: z.string().optional().describe("Acquisition date (ISO). Required to commit — FastBound rejects a missing date (it does not default to now)."),
   isManufacturingAcquisition: z.boolean().optional().describe("FFL type 07/10 manufacturing only."),
   note: z.string().optional(),
   purchaseOrderNumber: z.string().optional(),

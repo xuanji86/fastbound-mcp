@@ -89,13 +89,16 @@ export function formatApiError(err: FastBoundApiError): string {
     case 403:
       return `Forbidden (403). ${msg ?? "The API key lacks permission for this operation."}`;
     case 404:
-      return `Not found (404) for ${err.path}. The id/serial may not exist in this account.`;
+      if (/\/Commit$/.test(err.path)) {
+        return `Not found (404) for ${err.path}. A successful commit deletes the pending record, so this usually means it was ALREADY COMMITTED — do not re-create it. Confirm via search_items (dispositionId / serial).`;
+      }
+      return `Not found (404) for ${err.path}. The id/serial may not exist in this account (a committed acquisition/disposition is no longer addressable by its pending id).`;
     case 409:
       return `Conflict (409): ${msg ?? "duplicate or already-committed record."}${fieldLines}`;
     case 422:
       return `Validation failed (422)${msg ? `: ${msg}` : ""}.${fieldLines || " No field details returned."}`;
     case 429:
-      return `Rate limit exceeded (60 req/min). ${msg ?? "Retried and still throttled; try again shortly."}`;
+      return `Rate limit exceeded. ${msg ?? "Retried and still throttled; try again shortly."}`;
     default:
       if (err.status >= 500) {
         return `FastBound server error (${err.status}). The request was NOT confirmed applied; do not blindly retry committing operations.`;

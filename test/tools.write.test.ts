@@ -66,6 +66,21 @@ describe("update_item GET-merge-PUT", () => {
   });
 });
 
+describe("update_item on a disposed item", () => {
+  it("carries the disposition-side fields FastBound requires on the PUT", async () => {
+    const current = {
+      itemNumber: "1", manufacturer: "M", serial: "S1", model: "M1", caliber: "9mm", type: "Pistol",
+      acquire_Date: "2020-01-01", acquisitionType: "Purchase",
+      dispositionType: "Retail Sale", dispose_Date: "2021-02-03", otsn: "O-1", ttsn: null,
+    };
+    const t = text(await find(itemTools, "update_item").handler({ id: "x", serial: "S2" }, ctxWith(current)));
+    expect(t).toContain('"dispositionType": "Retail Sale"');
+    expect(t).toContain('"dispose_Date": "2021-02-03"');
+    expect(t).toContain('"otsn": "O-1"');
+    expect(t).not.toContain('"ttsn"'); // null on the record → not sent
+  });
+});
+
 describe("update_acquisition GET-merge-PUT", () => {
   it("merges changes over the current pending acquisition and previews the body", async () => {
     const current = {

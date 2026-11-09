@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import type { ToolDef } from "./types.js";
-import { binaryResult } from "../result.js";
+import { binaryResult, okResult } from "../result.js";
 import { auditUserArg } from "../schemas/common.js";
 import { auditUserRequired, resolveAuditUser } from "../writeGuard.js";
 
@@ -20,7 +20,11 @@ const downloadBoundBook: ToolDef = {
   handler: async (args, ctx) => {
     const audit = resolveAuditUser(args, ctx.config);
     if (!audit) return auditUserRequired("generate the bound book", ctx.config);
-    const bin = await ctx.client.downloadBinary("/Downloads/BoundBook", { method: "POST", auditUser: audit });
+    // The endpoint answers with a time-limited link to the PDF, not the PDF itself
+    // (204 = no bound book has been generated for this account yet).
+    const res = await ctx.client.post<{ url?: string }>("/Downloads/BoundBook", undefined, audit);
+    if (!res.data?.url) return okResult("no bound book PDF is available for this account yet (nothing to download)");
+    const bin = await ctx.client.fetchSignedUrl(res.data.url);
     return binaryResult("bound book", bin.bytes, bin.contentType, bin.filename);
   },
 };

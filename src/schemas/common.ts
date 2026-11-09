@@ -7,8 +7,15 @@
 import { z } from "zod";
 
 export const pagination = {
-  take: z.number().int().min(1).max(150).optional().describe("Page size (max 150)."),
-  skip: z.number().int().min(0).optional().describe("Number of records to skip (pagination offset)."),
+  take: z.number().int().min(1).max(100).optional().describe("Page size (the server returns at most 100)."),
+  skip: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      "PAGE INDEX, not a record offset: 0 = first page, 1 = second page. Advance by 1 per page (never by `take`); the last page is the one with fewer than `take` records.",
+    ),
 };
 
 export const confirmFlag = {

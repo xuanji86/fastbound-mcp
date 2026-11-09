@@ -19,7 +19,7 @@ import {
 export function runPlan(ctx: ToolContext, audit: string, plan: WritePlan): Promise<ApiResponse<unknown>> {
   switch (plan.method) {
     case "POST":
-      return ctx.client.post(plan.path, plan.body, audit);
+      return ctx.client.post(plan.path, plan.body, audit, plan.query);
     case "PUT":
       return ctx.client.put(plan.path, plan.body, audit);
     case "DELETE":

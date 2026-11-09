@@ -67,18 +67,19 @@ export function extractFastBoundHeaders(headers: HeaderBag): HeaderBag {
 export function fastBoundHeaderNotes(headers: HeaderBag): string[] {
   const notes: string[] = [];
   if (headers["x-fastbound-multiplesale"]) {
+    const url = headers["x-fastbound-multiplesaleurl"];
     notes.push(
-      "A Multiple Sale report (ATF Form 3310.4/5300.9) was triggered by this disposition; a user must review and transmit it.",
+      `A Multiple Sale report (ATF Form 3310.4/5300.9) was triggered by this disposition; a user must review and transmit it${url ? `: ${url}` : "."}`,
     );
   }
   if (headers["x-fastbound-existingcontactid"]) {
     notes.push(
-      `FastBound matched an existing contact (id ${headers["x-fastbound-existingcontactid"]}); your create/update may have deduplicated.`,
+      `FastBound matched an existing contact (id ${headers["x-fastbound-existingcontactid"]}); use that id instead of creating a duplicate.`,
     );
   }
   if (headers["x-fastbound-acquisitionid"]) {
     notes.push(
-      `An auto-acquisition was created in the receiving account (acquisition id ${headers["x-fastbound-acquisitionid"]}) by this FFL transfer.`,
+      `A pending acquisition was created in the receiving FFL's account ${headers["x-fastbound-acquisitionaccount"] ?? ""} (acquisition id ${headers["x-fastbound-acquisitionid"]}) by this transfer; they still have to commit it.`,
     );
   }
   return notes;
@@ -207,6 +208,25 @@ export class FastBoundClient {
     return this.request<T>("DELETE", path, { auditUser, query });
   }
 
+  /**
+   * GET a pre-signed, time-limited URL FastBound handed back (e.g. the bound book
+   * PDF). Sends no Authorization / audit headers — the URL itself is the credential.
+   */
+  async fetchSignedUrl(url: string): Promise<BinaryResponse> {
+    const res = await this.fetchFn(url, { method: "GET" });
+    const headers = headersToBag(res.headers);
+    if (!res.ok) {
+      throw new FastBoundApiError(res.status, undefined, headers, SIGNED_URL_PATH);
+    }
+    return {
+      bytes: new Uint8Array(await res.arrayBuffer()),
+      contentType: headers["content-type"] ?? "application/octet-stream",
+      filename: filenameFromDisposition(headers["content-disposition"]),
+      headers,
+      status: res.status,
+    };
+  }
+
   async downloadBinary(
     path: string,
     opts: { body?: unknown; query?: Query; auditUser?: string; method?: "GET" | "POST" } = {},
@@ -230,6 +250,9 @@ export class FastBoundClient {
     };
   }
 }
+
+/** Never put a pre-signed URL (it is a bearer credential) into an error path. */
+const SIGNED_URL_PATH = "(pre-signed download url)";
 
 async function safeParseBody(res: Response): Promise<unknown> {
   const text = await res.text().catch(() => "");

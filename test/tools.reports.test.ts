@@ -14,6 +14,12 @@ function ctxWith(defaultAuditUser: string | undefined) {
   const ctx = {
     config: { alias: "main", defaultAuditUser, accountNumber: "10001" },
     client: {
+      // download_bound_book: POST returns a pre-signed link, then the PDF is fetched from it.
+      post: async (path: string, _body: unknown, auditUser?: string) => {
+        calls.push({ path, opts: { method: "POST", auditUser } });
+        return { data: { url: "https://blob.test/book.pdf?sig=x" }, headers: {}, status: 200 };
+      },
+      fetchSignedUrl: async () => ({ bytes: new Uint8Array([37, 80, 68, 70]), contentType: "application/pdf" }),
       downloadBinary: async (path: string, opts?: { auditUser?: string; method?: string }) => {
         calls.push({ path, opts });
         return { bytes: new Uint8Array([37, 80, 68, 70]), contentType: "application/pdf", filename: "f.pdf" };
@@ -53,5 +59,14 @@ describe.each(downloads)("%s X-AuditUser", (name, args, path, opts) => {
     expect(text(res)).toMatch(/^BLOCKED/);
     expect(text(res)).toContain('account "main"');
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("download_bound_book", () => {
+  it("reports nothing to download when FastBound answers 204 (no link)", async () => {
+    const { ctx } = ctxWith("a@b.com");
+    (ctx.client as unknown as { post: unknown }).post = async () => ({ data: undefined, headers: {}, status: 204 });
+    const res = await tool("download_bound_book").handler({}, ctx);
+    expect(text(res)).toMatch(/^OK — no bound book PDF/);
   });
 });

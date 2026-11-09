@@ -179,6 +179,6 @@ describe("X-FastBound-* headers", () => {
     expect(fb["x-fastbound-multiplesale"]).toBe("true");
     const notes = fastBoundHeaderNotes(res.headers);
     expect(notes.join(" ")).toMatch(/Multiple Sale report/);
-    expect(notes.join(" ")).toMatch(/auto-acquisition .*acq-9/);
+    expect(notes.join(" ")).toMatch(/pending acquisition .*acq-9/);
   });
 });
